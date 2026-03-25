@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sine Wave Plotter - 3-Axis Shared Analysis</title>
+    <link rel="stylesheet" href="static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Space+Grotesk:wght@300;500;700&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <div class="glass-container">
+        <header>
+            <h1>3-Axis Wave <span class="accent-text">Analyzer</span></h1>
+            <p>Global parameters for X, Y, and Z analysis</p>
+            <div style="margin-top: 20px; text-align: center;">
+                <a href="/bearing-calc" class="secondary-btn" style="padding: 10px 20px; width: auto; display: inline-block;">Bearing Frequency Calculator</a>
+            </div>
+        </header>
+
+        <main>
+            <div class="controls-panel">
+                <div class="parameter-card">
+                    <h3>Wave Parameters</h3>
+                    <div class="input-group">
+                        <label for="amplitude">Amplitude (A)</label>
+                        <input type="number" id="amplitude" value="1.0" step="0.1">
+                        <span class="hint">Applied to all 3 axes.</span>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="frequency">Frequency (Hz)</label>
+                        <input type="number" id="frequency" value="1.0" step="0.5">
+                    </div>
+
+                    <div class="input-group">
+                        <label for="omega">Omega (Φ / Phase)</label>
+                        <input type="number" id="omega" value="0.0" step="0.1">
+                    </div>
+
+                    <div class="input-group">
+                        <label for="rpm">Shaft Speed (RPM)</label>
+                        <input type="number" id="rpm" value="1800" step="100">
+                    </div>
+
+                    <button id="plotBtn" class="primary-btn">Update Analysis</button>
+
+                    <div class="divider"><span>OR</span></div>
+
+                    <!-- CSV Upload -->
+                    <div class="upload-section">
+                        <h3>Upload CSV Data</h3>
+                        <div class="file-drop-area" id="dropArea">
+                            <span class="fake-btn">Choose File</span>
+                            <span class="file-msg">or drag and drop here</span>
+                            <input class="file-input" type="file" id="csvFile" accept=".csv">
+                        </div>
+                        <button id="uploadBtn" class="secondary-btn">Process CSV</button>
+                    </div>
+
+                    <div class="divider"><span>OR</span></div>
+
+                    <!-- Manual Array Input — separate X / Y / Z -->
+                    <div class="manual-input-section">
+                        <h3>Manual Array Input</h3>
+                        <p class="section-hint">Enter independent arrays for each axis. Use comma or space as separator.
+                            Example: <code>1.2, 2.3, -1.4</code></p>
+
+                        <div class="axis-input-group">
+                            <label class="axis-label x-label" for="arrayX">
+                                <span class="axis-dot x-dot"></span> Axis X
+                            </label>
+                            <textarea id="arrayX" class="axis-textarea"
+                                placeholder="e.g. 1.2, 2.3, 3.4 or [1.2 2.3 3.4]"></textarea>
+                            <span class="axis-error" id="err_x"></span>
+                            <span class="axis-count" id="count_x"></span>
+                        </div>
+
+                        <div class="axis-input-group">
+                            <label class="axis-label y-label" for="arrayY">
+                                <span class="axis-dot y-dot"></span> Axis Y
+                            </label>
+                            <textarea id="arrayY" class="axis-textarea"
+                                placeholder="e.g. 1.2, 2.3, 3.4 or [1.2 2.3 3.4]"></textarea>
+                            <span class="axis-error" id="err_y"></span>
+                            <span class="axis-count" id="count_y"></span>
+                        </div>
+
+                        <div class="axis-input-group">
+                            <label class="axis-label z-label" for="arrayZ">
+                                <span class="axis-dot z-dot"></span> Axis Z
+                            </label>
+                            <textarea id="arrayZ" class="axis-textarea"
+                                placeholder="e.g. 1.2, 2.3, 3.4 or [1.2 2.3 3.4]"></textarea>
+                            <span class="axis-error" id="err_z"></span>
+                            <span class="axis-count" id="count_z"></span>
+                        </div>
+
+                        <!-- Global error banner -->
+                        <div class="error-banner" id="arrayErrorBanner" style="display:none;"></div>
+
+                        <button id="processArrayBtn" class="secondary-btn">Process Arrays</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="data-panel">
+                <div class="chart-panel">
+                    <canvas id="sineChart"></canvas>
+                </div>
+                
+                <div class="chart-panel">
+                    <h3 class="chart-title">Envelope Spectrum (FFT)</h3>
+                    <canvas id="spectrumChart"></canvas>
+                </div>
+
+                <div class="stats-table-container">
+                    <table class="stats-table">
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                                <th class="x-head">Axis X</th>
+                                <th class="y-head">Axis Y</th>
+                                <th class="z-head">Axis Z</th>
+                            </tr>
+                        </thead>
+                        <tbody id="statsBody">
+                            <tr>
+                                <td>Peak</td>
+                                <td id="val_peak_x">-</td>
+                                <td id="val_peak_y">-</td>
+                                <td id="val_peak_z">-</td>
+                            </tr>
+                            <tr>
+                                <td>GRMS</td>
+                                <td id="val_grms_x">-</td>
+                                <td id="val_grms_y">-</td>
+                                <td id="val_grms_z">-</td>
+                            </tr>
+                            <tr>
+                                <td>VRMS (mm/s)</td>
+                                <td id="val_vrms_x">-</td>
+                                <td id="val_vrms_y">-</td>
+                                <td id="val_vrms_z">-</td>
+                            </tr>
+                            <tr>
+                                <td>gE (Env)</td>
+                                <td id="val_ge_x">-</td>
+                                <td id="val_ge_y">-</td>
+                                <td id="val_ge_z">-</td>
+                            </tr>
+                            <tr>
+                                <td>Skewness</td>
+                                <td id="val_skewness_x">-</td>
+                                <td id="val_skewness_y">-</td>
+                                <td id="val_skewness_z">-</td>
+                            </tr>
+                            <tr>
+                                <td>Kurtosis</td>
+                                <td id="val_kurtosis_x">-</td>
+                                <td id="val_kurtosis_y">-</td>
+                                <td id="val_kurtosis_z">-</td>
+                            </tr>
+                            <tr>
+                                <td>Crest Factor</td>
+                                <td id="val_crest_x">-</td>
+                                <td id="val_crest_y">-</td>
+                                <td id="val_crest_z">-</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2026 3-Axis Sine Wave Analysis Tool</p>
+        </footer>
+    </div>
+    <script src="static/script.js?v=2.0"></script>
+</body>
+
+</html>
