@@ -11,7 +11,6 @@ import math
 from scipy.signal import butter, filtfilt, hilbert, detrend
 from scipy.fft import fft, rfft, rfftfreq
 from scipy.integrate import cumulative_trapezoid
-import matplotlib.pyplot as plt
 
 app = FastAPI(title="Sine Wave & CSV Analyzer")
 
@@ -32,11 +31,16 @@ def _adaptive_bandpass(signal: np.ndarray, fs: float, rpm: float, order: int = 4
     lowcut = 500
     highcut = 10000
     nyq = 0.5 * fs
+    print("nyq", nyq)
     # highcut = min(highcut, nyq * 0.9)
     low = lowcut / nyq
     high = highcut / nyq
     b, a = butter(order, [low, high], btype="band")
-    return filtfilt(b, a, signal)
+    print("b", b)
+    print("a", a)
+    filtered_signal = filtfilt(b, a, signal)
+    print("filtered_signal", filtered_signal)
+    return filtered_signal
 
 
 def mean(data):
@@ -86,9 +90,8 @@ class StatisticalAccumulator:
         if not self.daq_rate:
             return {}
 
-        fs = self.daq_rate
+        fs = 25600
         print("fs", fs)
-        print("amplitude", self.amplitude)
 
         # Remove DC
         detrended = data
@@ -102,7 +105,6 @@ class StatisticalAccumulator:
 
         # Shape Metrics
         std = np.std(detrended)
-        print("std", std)
         if std > 0:
             # skewness = float(np.mean((detrended / std) ** 3))
             # kurtosis = float(np.mean((detrended / std) ** 4))
@@ -115,14 +117,17 @@ class StatisticalAccumulator:
         vrms = self._compute_vrms(detrended, fs, self.amplitude)
 
         # Envelope RMS
-        ge, envelope = self._compute_ge(detrended, fs)
+        ge, envelope, gEop, gEPP = self._compute_ge(detrended, fs)
 
         # FFT of Envelope
         # Note: Added fallback for empty envelope or errors
         if envelope is not None and len(envelope) > 0:
             N = len(envelope)
-            freqs = np.fft.fftfreq(N,1/fs)
-            fft_envelope = np.abs(fft(envelope))
+            # Subtract mean to remove DC component for better spectrum visualization
+            envelope_detrended = envelope 
+            freqs = np.fft.fftfreq(N, 1/fs)
+            # Scale FFT by 2/N to get peak amplitude
+            fft_envelope = np.abs(fft(envelope_detrended))
         else:
             fft_envelope = np.array([])
             freqs = np.array([])
@@ -131,6 +136,8 @@ class StatisticalAccumulator:
             "grms": round(float(grms), 4),
             "vrms": round(float(vrms), 4),
             "ge": round(float(ge), 4),
+            "gEop": round(float(gEop), 4),
+            "gEPP": round(float(gEPP), 4),
             "skewness": round(skewness_val, 4),
             "kurtosis": round(kurtosis_val, 4),
             "crest_factor": round(float(crest_factor), 4),
@@ -146,19 +153,27 @@ class StatisticalAccumulator:
         vrms = (amplitude * 9.8) / (6.28 * fs) * 1000
         return float(vrms)
 
-    def _compute_ge(self, detrended: np.ndarray, fs: float) -> Tuple[float, Optional[np.ndarray]]:
+    def _compute_ge(self, detrended: np.ndarray, fs: float) -> Tuple[float, Optional[np.ndarray], float, float]:
         if not self.rpm or len(detrended) < 13:
-            return 0.0, None
+            return 0.0, None, 0.0, 0.0
         try:
+            fs = 25600
+            # Check if fs is high enough for the bandpass filter (500Hz - 10000Hz)
+            # Nyquist must be > 500Hz, so fs > 1000Hz
+            if fs <= 1000:
+                return 0.0, None, 0.0, 0.0
+
             filtered_signal = _adaptive_bandpass(detrended, fs, self.rpm)
-            analytic_signal = hilbert(filtered_signal)
+            analytic_signal = hilbert(filtered_signal)                                            #### perform fft after hilbert transform
             envelope = np.abs(analytic_signal)
             # Return RMS of envelope for 'ge' value
             ge_val = np.sqrt(np.mean(envelope ** 2))
-            return float(ge_val), envelope
+            gEop = np.max(envelope)
+            gEPP = np.max(envelope) - np.min(envelope)
+            return float(ge_val), envelope, float(gEop), float(gEPP)
         except Exception as e:
             print(f"Error in _compute_ge: {e}")
-            return 0.0, None
+            return 0.0, None, 0.0, 0.0
 
 
 # ──────────────────────────────────────────────────────────────
@@ -213,7 +228,8 @@ async def get_sine_wave(
     }
 
     accumulator = StatisticalAccumulator()
-    accumulator.set_params(daq_rate=f, rpm=rpm, amplitude=a)
+    # Use 'points' as the daq_rate so the filter has enough bandwidth for sine generation
+    accumulator.set_params(daq_rate=float(points), rpm=rpm, amplitude=a)
     axis_stats = accumulator.compute(y_base)
 
     stats = {"x": axis_stats, "y": axis_stats, "z": axis_stats}

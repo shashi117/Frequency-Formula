@@ -1,134 +1,270 @@
 let sineChart = null;
+let envelopeChart = null;
 let spectrumChart = null;
+let spectrumChart500 = null;
 
 // ──────────────────────────────────────────────────────────────
-// CHART
+// uPlot Tooltip Plugin
+// ──────────────────────────────────────────────────────────────
+function tooltipPlugin() {
+    let tooltip;
+
+    return {
+        hooks: {
+            init: (u) => {
+                tooltip = document.createElement("div");
+                tooltip.className = "u-tooltip";
+                u.root.querySelector(".u-over").appendChild(tooltip);
+            },
+            setCursor: (u) => {
+                const { left, top, idx } = u.cursor;
+                if (idx == null) {
+                    tooltip.style.display = "none";
+                    return;
+                }
+
+                const x = u.data[0][idx];
+                const xLabel = u.axes[0].label || "X";
+                let html = `<div><strong>${xLabel}: ${x.toFixed(3)}</strong></div>`;
+
+                for (let i = 1; i < u.data.length; i++) {
+                    const val = u.data[i][idx];
+                    if (val !== null && val !== undefined) {
+                        const series = u.series[i];
+                        html += `<div style="color: ${series.stroke}">● ${series.label}: ${val.toFixed(4)}</div>`;
+                    }
+                }
+
+                tooltip.innerHTML = html;
+                tooltip.style.display = "block";
+                tooltip.style.left = (left + 15) + "px";
+                tooltip.style.top = (top + 15) + "px";
+            }
+        }
+    };
+}
+
+function getUPlotBaseOptions(title, xLabel, yLabel, series) {
+    return {
+        title: title,
+        width: 800,
+        height: 350,
+        plugins: [tooltipPlugin()],
+        cursor: {
+            drag: { x: true, y: true }
+        },
+        scales: {
+            x: { time: false },
+        },
+        series: [
+            { label: xLabel },
+            ...series
+        ],
+        axes: [
+            {
+                label: xLabel,
+                stroke: "#8b949e",
+                grid: { stroke: "rgba(255, 255, 255, 0.05)" },
+                ticks: { stroke: "#8b949e" }
+            },
+            {
+                label: yLabel,
+                stroke: "#8b949e",
+                grid: { stroke: "rgba(255, 255, 255, 0.1)" },
+                ticks: { stroke: "#8b949e" }
+            }
+        ],
+        hooks: {
+            setSelect: [
+                u => {
+                    let { left, top, width, height } = u.select;
+                    if (width > 0 && height > 0) {
+                        let xMin = u.posToVal(left, 'x');
+                        let xMax = u.posToVal(left + width, 'x');
+                        let yMin = u.posToVal(top + height, 'y');
+                        let yMax = u.posToVal(top, 'y');
+                        u.setScale('x', { min: xMin, max: xMax });
+                        u.setScale('y', { min: yMin, max: yMax });
+                        u.setSelect({ width: 0, height: 0 }, false);
+                    }
+                }
+            ]
+        }
+    };
+}
+
+function resizeUPlot(u, containerId) {
+    if (!u) return;
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    u.setSize({
+        width: rect.width,
+        height: rect.height
+    });
+}
+
+// ──────────────────────────────────────────────────────────────
+// CHART PLOTTING
 // ──────────────────────────────────────────────────────────────
 
 function plotChart(t, waveforms) {
-    const ctx = document.getElementById('sineChart').getContext('2d');
+    const container = document.getElementById('sineChart');
+    if (!container) return;
+    container.innerHTML = "";
 
-    if (sineChart) {
-        sineChart.destroy();
-    }
+    const data = [
+        t,
+        waveforms.x,
+        waveforms.y,
+        waveforms.z
+    ];
 
-    sineChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: t.map(val => parseFloat(val).toFixed(3)),
-            datasets: [
-                {
-                    label: 'Axis X',
-                    data: waveforms.x,
-                    borderColor: '#ff7b72',
-                    borderWidth: 2.5,
-                    pointRadius: 0,
-                    tension: 0.4,
-                    spanGaps: false
-                },
-                {
-                    label: 'Axis Y',
-                    data: waveforms.y,
-                    borderColor: '#7ee787',
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    tension: 0.4,
-                    borderDash: [5, 5],
-                    spanGaps: false
-                },
-                {
-                    label: 'Axis Z',
-                    data: waveforms.z,
-                    borderColor: '#d2a8ff',
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    tension: 0.4,
-                    borderDash: [2, 2],
-                    spanGaps: false
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'top',
-                    labels: { color: '#8b949e', font: { family: 'Outfit' } }
-                }
-            },
-            scales: {
-                x: {
-                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                    ticks: { color: '#8b949e', maxTicksLimit: 10 }
-                },
-                y: {
-                    grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                    ticks: { color: '#8b949e' }
-                }
-            }
+    const series = [
+        { label: "Axis X", stroke: "#ff7b72", width: 2 },
+        { label: "Axis Y", stroke: "#7ee787", width: 2, dash: [10, 5] },
+        { label: "Axis Z", stroke: "#d2a8ff", width: 2, dash: [5, 5] }
+    ];
+
+    const opts = getUPlotBaseOptions("", "Time (s)", "Amplitude", series);
+    sineChart = new uPlot(opts, data, container);
+    resizeUPlot(sineChart, 'sineChart');
+    window.addEventListener("resize", () => resizeUPlot(sineChart, 'sineChart'));
+
+    container.addEventListener("dblclick", () => {
+        sineChart.setData(data, true);
+    });
+}
+
+function plotEnvelopes(t, stats) {
+    const container = document.getElementById('envelopeChart');
+    if (!container) return;
+    container.innerHTML = "";
+
+    const data = [t];
+    const series = [];
+    const colors = { x: '#ff7b72', y: '#7ee787', z: '#d2a8ff' };
+
+    ['x', 'y', 'z'].forEach(axis => {
+        if (stats[axis] && stats[axis].envelope && stats[axis].envelope.length > 0) {
+            data.push(stats[axis].envelope);
+            series.push({
+                label: `Envelope ${axis.toUpperCase()}`,
+                stroke: colors[axis],
+                width: 1.5
+            });
         }
+    });
+
+    if (data.length <= 1) return;
+
+    const opts = getUPlotBaseOptions("", "Time (s)", "Envelope", series);
+    envelopeChart = new uPlot(opts, data, container);
+    resizeUPlot(envelopeChart, 'envelopeChart');
+    window.addEventListener("resize", () => resizeUPlot(envelopeChart, 'envelopeChart'));
+
+    container.addEventListener("dblclick", () => {
+        envelopeChart.setData(data, true);
     });
 }
 
 function plotSpectrum(stats) {
-    const canvas = document.getElementById('spectrumChart');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    
-    const s = stats.x || stats.y || stats.z;
-    if (!s || !s.freqs || s.freqs.length === 0) return;
+    const container = document.getElementById('spectrumChart');
+    if (!container) return;
+    container.innerHTML = "";
 
-    if (spectrumChart) {
-        spectrumChart.destroy();
-    }
+    let freqLabels = [];
+    const data = [];
+    const series = [];
+    const colors = { x: '#ff7b72', y: '#7ee787', z: '#d2a8ff' };
 
-    // Limit to 0-1000Hz
-    const N_half = Math.floor(s.freqs.length / 2);
-    const validIndices = [];
-    for (let i = 0; i < N_half; i++) {
-        if (s.freqs[i] <= 1000) {
-            validIndices.push(i);
-        }
-    }
+    ['x', 'y', 'z'].forEach(axis => {
+        const s = stats[axis];
+        if (!s || !s.freqs || s.freqs.length === 0) return;
 
-    const filteredFreqs = validIndices.map(i => s.freqs[i].toFixed(1));
-    const filteredAmps = validIndices.map(i => s.fft_envelope[i]);
-
-    spectrumChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: filteredFreqs,
-            datasets: [{
-                label: 'Envelope Spectrum (X)',
-                data: filteredAmps,
-                borderColor: '#58a6ff',
-                backgroundColor: 'rgba(88, 166, 255, 0.1)',
-                borderWidth: 1.5,
-                fill: true,
-                pointRadius: 0,
-                tension: 0.1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false }
-            },
-            scales: {
-                x: {
-                    title: { display: true, text: 'Frequency (Hz)', color: '#8b949e' },
-                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                    ticks: { color: '#8b949e', maxTicksLimit: 20 }
-                },
-                y: {
-                    title: { display: true, text: 'Amplitude', color: '#8b949e' },
-                    grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                    ticks: { color: '#8b949e' }
-                }
+        const N = s.envelope ? s.envelope.length : (s.fft_envelope.length * 2);
+        const N_half = Math.floor(s.freqs.length / 2);
+        const validIndices = [];
+        
+        for (let i = 1; i < N_half; i++) {
+            if (s.freqs[i] >= 0 && s.freqs[i] <= 1000) {
+                validIndices.push(i);
             }
         }
+
+        if (freqLabels.length === 0) {
+            freqLabels = validIndices.map(i => s.freqs[i]);
+            data.push(freqLabels);
+        }
+
+        data.push(validIndices.map(i => (s.fft_envelope[i] * 2.0 / N)));
+        series.push({
+            label: `Spectrum ${axis.toUpperCase()}`,
+            stroke: colors[axis],
+            width: 1.5,
+            fill: colors[axis] + "1a"
+        });
+    });
+
+    if (data.length <= 1) return;
+
+    const opts = getUPlotBaseOptions("", "Frequency (Hz)", "Amplitude (pk)", series);
+    spectrumChart = new uPlot(opts, data, container);
+    resizeUPlot(spectrumChart, 'spectrumChart');
+    window.addEventListener("resize", () => resizeUPlot(spectrumChart, 'spectrumChart'));
+
+    container.addEventListener("dblclick", () => {
+        spectrumChart.setData(data, true);
+    });
+}
+
+function plotSpectrum500(stats) {
+    const container = document.getElementById('spectrumChart500');
+    if (!container) return;
+    container.innerHTML = "";
+
+    let freqLabels = [];
+    const data = [];
+    const series = [];
+    const colors = { x: '#ff7b72', y: '#7ee787', z: '#d2a8ff' };
+
+    ['x', 'y', 'z'].forEach(axis => {
+        const s = stats[axis];
+        if (!s || !s.freqs || s.freqs.length === 0) return;
+
+        const N = s.envelope ? s.envelope.length : (s.fft_envelope.length * 2);
+        const N_half = Math.floor(s.freqs.length / 2);
+        const validIndices = [];
+        
+        for (let i = 1; i < N_half; i++) {
+            if (s.freqs[i] >= 10 && s.freqs[i] <= 500) {
+                validIndices.push(i);
+            }
+        }
+
+        if (freqLabels.length === 0) {
+            freqLabels = validIndices.map(i => s.freqs[i]);
+            data.push(freqLabels);
+        }
+
+        data.push(validIndices.map(i => (s.fft_envelope[i] * 2.0 / N)));
+        series.push({
+            label: `Spectrum ${axis.toUpperCase()}`,
+            stroke: colors[axis],
+            width: 1.5,
+            fill: colors[axis] + "1a"
+        });
+    });
+
+    if (data.length <= 1) return;
+
+    const opts = getUPlotBaseOptions("", "Frequency (Hz)", "Amplitude (pk)", series);
+    spectrumChart500 = new uPlot(opts, data, container);
+    resizeUPlot(spectrumChart500, 'spectrumChart500');
+    window.addEventListener("resize", () => resizeUPlot(spectrumChart500, 'spectrumChart500'));
+
+    container.addEventListener("dblclick", () => {
+        spectrumChart500.setData(data, true);
     });
 }
 
@@ -148,6 +284,8 @@ function updateStats(stats) {
         const grmsEl = document.getElementById(`val_grms_${axis}`);
         const vrmsEl = document.getElementById(`val_vrms_${axis}`);
         const geEl = document.getElementById(`val_ge_${axis}`);
+        const gEopEl = document.getElementById(`val_gEop_${axis}`);
+        const gEPPEl = document.getElementById(`val_gEPP_${axis}`);
         const skewEl = document.getElementById(`val_skewness_${axis}`);
         const kurtEl = document.getElementById(`val_kurtosis_${axis}`);
         const crestEl = document.getElementById(`val_crest_${axis}`);
@@ -156,12 +294,16 @@ function updateStats(stats) {
         if (grmsEl) grmsEl.textContent = s.grms.toFixed(4);
         if (vrmsEl) vrmsEl.textContent = s.vrms.toFixed(4);
         if (geEl) geEl.textContent = s.ge.toFixed(4);
+        if (gEopEl) gEopEl.textContent = s.gEop.toFixed(4);
+        if (gEPPEl) gEPPEl.textContent = s.gEPP.toFixed(4);
         if (skewEl) skewEl.textContent = s.skewness.toFixed(4);
         if (kurtEl) kurtEl.textContent = s.kurtosis.toFixed(4);
         if (crestEl) crestEl.textContent = s.crest_factor.toFixed(4);
     });
 
+    plotEnvelopes(stats.t_vec || stats.t || [], stats);
     plotSpectrum(stats);
+    plotSpectrum500(stats);
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -306,10 +448,10 @@ async function processArrayAxes() {
         return;
     }
 
-    const hasError = (!results.x.empty && !results.x.valid) || 
-                     (!results.y.empty && !results.y.valid) || 
-                     (!results.z.empty && !results.z.valid);
-    
+    const hasError = (!results.x.empty && !results.x.valid) ||
+        (!results.y.empty && !results.y.valid) ||
+        (!results.z.empty && !results.z.valid);
+
     if (hasError) {
         showArrayError('Please fix the errors in the input fields.');
         return;

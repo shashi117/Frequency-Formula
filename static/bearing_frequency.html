@@ -5,128 +5,870 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bearing Frequency Calculator</title>
-    <link rel="stylesheet" href="static/style.css">
+    <link rel="stylesheet" href="https://unpkg.com/uplot/dist/uPlot.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Space+Grotesk:wght@300;500;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=DM+Sans:wght@300;400;500;600&display=swap"
         rel="stylesheet">
+    <script src="https://unpkg.com/uplot/dist/uPlot.iife.min.js"></script>
+    <style>
+        :root {
+            --bg: #07090f;
+            --surface: #0e1118;
+            --surface2: #131720;
+            --border: #1e2433;
+            --border2: #262d3d;
+            --accent: #4f9cff;
+            --accent-dim: rgba(79, 156, 255, 0.12);
+            --accent-glow: rgba(79, 156, 255, 0.25);
+            --green: #3fcf8e;
+            --amber: #f5a623;
+            --red: #ff5c5c;
+            --purple: #a78bfa;
+            --text: #d4daf0;
+            --muted: #5a6480;
+            --muted2: #3d4560;
+            --mono: 'IBM Plex Mono', monospace;
+            --sans: 'DM Sans', sans-serif;
+        }
+
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--sans);
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 32px 20px;
+            background-image:
+                radial-gradient(ellipse 80% 50% at 20% -10%, rgba(79, 156, 255, 0.06) 0%, transparent 60%),
+                radial-gradient(ellipse 60% 40% at 80% 110%, rgba(63, 207, 142, 0.04) 0%, transparent 50%);
+        }
+
+        .page-wrap {
+            max-width: 1320px;
+            margin: 0 auto;
+        }
+
+        /* ── Header ── */
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 36px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .header-left h1 {
+            font-family: var(--mono);
+            font-size: 1.5rem;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+            color: #fff;
+        }
+
+        .header-left h1 span {
+            color: var(--accent);
+        }
+
+        .header-left p {
+            margin-top: 4px;
+            font-size: 0.82rem;
+            color: var(--muted);
+            letter-spacing: 0.3px;
+        }
+
+        .back-btn {
+            font-family: var(--mono);
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--accent);
+            background: var(--accent-dim);
+            border: 1px solid rgba(79, 156, 255, 0.25);
+            border-radius: 6px;
+            padding: 8px 16px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.2s, border-color 0.2s;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .back-btn:hover {
+            background: rgba(79, 156, 255, 0.2);
+            border-color: var(--accent);
+        }
+
+        /* ── Layout ── */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 290px 1fr;
+            gap: 24px;
+            align-items: start;
+        }
+
+        /* ── Controls ── */
+        .controls-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .card-title {
+            font-family: var(--mono);
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            color: var(--muted);
+            margin-bottom: 18px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-title::before {
+            content: '';
+            display: inline-block;
+            width: 3px;
+            height: 12px;
+            background: var(--accent);
+            border-radius: 2px;
+        }
+
+        .input-group {
+            margin-bottom: 14px;
+        }
+
+        .input-group:last-of-type {
+            margin-bottom: 0;
+        }
+
+        label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--muted);
+            margin-bottom: 6px;
+            letter-spacing: 0.2px;
+        }
+
+        input[type="number"],
+        input[type="text"] {
+            width: 100%;
+            background: var(--surface2);
+            border: 1px solid var(--border2);
+            border-radius: 7px;
+            padding: 9px 12px;
+            color: var(--text);
+            font-family: var(--mono);
+            font-size: 0.85rem;
+            transition: border-color 0.18s, box-shadow 0.18s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-dim);
+        }
+
+        .hint {
+            display: block;
+            margin-top: 4px;
+            font-size: 0.7rem;
+            color: var(--muted2);
+        }
+
+        .array-inputs {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .calc-btn {
+            width: 100%;
+            margin-top: 18px;
+            background: var(--accent);
+            color: var(--bg);
+            border: none;
+            border-radius: 8px;
+            padding: 12px;
+            font-family: var(--mono);
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: opacity 0.18s, transform 0.15s, box-shadow 0.18s;
+            box-shadow: 0 4px 16px rgba(79, 156, 255, 0.2);
+        }
+
+        .calc-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(79, 156, 255, 0.35);
+        }
+
+        .calc-btn:active {
+            transform: translateY(0);
+        }
+
+        /* ── Right column ── */
+        .data-column {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        /* ── Chart ── */
+        .chart-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .chart-card .card-title {
+            margin-bottom: 16px;
+        }
+
+        #bearingSpectrumChart {
+            width: 100%;
+            height: 300px;
+        }
+
+        /* ── Fault frequencies table ── */
+        .fault-freq-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 30px;
+        }
+
+        .fault-freq-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .fault-freq-header .card-title {
+            margin-bottom: 0;
+        }
+
+        .freq-table-wrap {
+            overflow-x: auto;
+        }
+
+        .freq-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82rem;
+        }
+
+        .freq-table thead tr {
+            background: var(--surface2);
+        }
+
+        .freq-table th {
+            padding: 11px 16px;
+            text-align: left;
+            font-family: var(--mono);
+            font-size: 0.68rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--muted);
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+
+        .freq-table th.num {
+            text-align: right;
+        }
+
+        .freq-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.83rem;
+        }
+
+        .freq-table td.num {
+            text-align: right;
+            font-family: var(--mono);
+            font-weight: 600;
+        }
+
+        .freq-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .freq-table tbody tr:hover td {
+            background: rgba(255, 255, 255, 0.018);
+        }
+
+        .sno {
+            font-family: var(--mono);
+            font-size: 0.7rem;
+            color: var(--muted2);
+            width: 40px;
+        }
+
+        .topic-name {
+            color: var(--text);
+        }
+
+        .topic-tag {
+            display: inline-block;
+            margin-left: 6px;
+            font-family: var(--mono);
+            font-size: 0.65rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: var(--accent-dim);
+            color: var(--accent);
+            border: 1px solid rgba(79, 156, 255, 0.2);
+            vertical-align: middle;
+        }
+
+        .val-dash {
+            color: var(--muted2);
+            font-family: var(--mono);
+        }
+
+        .hz-val {
+            color: var(--green);
+        }
+
+        .order-val {
+            color: var(--amber);
+        }
+
+        .zero-val {
+            color: var(--muted);
+        }
+
+        /* ── Harmonics section ── */
+        .harmonics-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .harmonics-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .harmonics-header .card-title {
+            margin-bottom: 0;
+        }
+
+        .harmonics-scroll {
+            overflow-x: auto;
+        }
+
+        .harm-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.78rem;
+            min-width: 820px;
+        }
+
+        /* Sticky first column */
+        .harm-table th:first-child,
+        .harm-table td:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 2;
+            background: var(--surface2);
+            border-right: 1px solid var(--border2);
+        }
+
+        .harm-table thead tr:first-child th {
+            border-bottom: 1px solid var(--border2);
+        }
+
+        .harm-table th {
+            background: var(--surface2);
+            padding: 10px 13px;
+            font-family: var(--mono);
+            font-size: 0.63rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.7px;
+            color: var(--muted);
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+
+        .harm-table th.section-amp {
+            color: var(--green);
+            border-bottom: 2px solid rgba(63, 207, 142, 0.3);
+        }
+
+        .harm-table th.section-freq {
+            color: var(--amber);
+            border-bottom: 2px solid rgba(245, 166, 35, 0.3);
+        }
+
+        .harm-table th.defect-head {
+            text-align: left;
+        }
+
+        .harm-table td {
+            padding: 11px 13px;
+            text-align: center;
+            font-family: var(--mono);
+            font-size: 0.78rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .harm-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .harm-table tbody tr:hover td {
+            background: rgba(255, 255, 255, 0.015);
+        }
+
+        .harm-table tbody tr:hover td:first-child {
+            background: var(--surface2);
+        }
+
+        .defect-label {
+            text-align: left !important;
+            color: var(--text);
+            white-space: nowrap;
+            font-size: 0.78rem;
+        }
+
+        .defect-badge {
+            display: inline-block;
+            margin-left: 7px;
+            font-size: 0.6rem;
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            vertical-align: middle;
+        }
+
+        .badge-bsf {
+            background: rgba(167, 139, 250, 0.15);
+            color: var(--purple);
+            border: 1px solid rgba(167, 139, 250, 0.3);
+        }
+
+        .badge-bpfo {
+            background: rgba(245, 166, 35, 0.12);
+            color: var(--amber);
+            border: 1px solid rgba(245, 166, 35, 0.3);
+        }
+
+        .badge-bpfi {
+            background: rgba(79, 156, 255, 0.12);
+            color: var(--accent);
+            border: 1px solid rgba(79, 156, 255, 0.28);
+        }
+
+        .badge-ftf {
+            background: rgba(63, 207, 142, 0.12);
+            color: var(--green);
+            border: 1px solid rgba(63, 207, 142, 0.28);
+        }
+
+        .amp-val {
+            color: var(--green);
+        }
+
+        .freq-val {
+            color: var(--amber);
+        }
+
+        .dash-val {
+            color: var(--muted2);
+        }
+
+        /* Harmonic index labels */
+        .harm-table th.harm-idx {
+            font-size: 0.68rem;
+            color: var(--muted2);
+        }
+
+        /* Section dividers in header */
+        .col-group-amp {
+            border-left: 2px solid rgba(63, 207, 142, 0.25);
+        }
+
+        .col-group-freq {
+            border-left: 2px solid rgba(245, 166, 35, 0.25);
+        }
+
+        td.col-group-amp {
+            border-left: 1px solid var(--border2);
+        }
+
+        td.col-group-freq {
+            border-left: 1px solid var(--border2);
+        }
+
+        /* Footer */
+        footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            font-size: 0.73rem;
+            color: var(--muted2);
+            font-family: var(--mono);
+            letter-spacing: 0.3px;
+        }
+
+        /* uPlot overrides */
+        .uplot .u-tooltip {
+            position: absolute;
+            background: rgba(14, 17, 24, 0.95);
+            padding: 8px 12px;
+            border-radius: 7px;
+            border: 1px solid var(--accent);
+            pointer-events: none;
+            z-index: 100;
+            font-size: 0.8rem;
+            color: var(--text);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+            display: none;
+        }
+
+        @media (max-width: 960px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+
+            header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+        }
+
+        /* Loading Overlay */
+        #loadingOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(7, 9, 15, 0.8);
+            backdrop-filter: blur(4px);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border2);
+            border-top: 3px solid var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading-text {
+            font-family: var(--mono);
+            font-size: 0.9rem;
+            color: var(--accent);
+            letter-spacing: 1px;
+        }
+
+        .zoom-hint {
+            font-size: 0.65rem;
+            color: var(--muted2);
+            margin-top: 8px;
+            font-family: var(--mono);
+            text-align: right;
+        }
+    </style>
 </head>
 
 <body>
-    <div class="glass-container">
+    <div class="page-wrap">
+
         <header>
-            <h1>Bearing Frequency <span class="accent-text">Calculator</span></h1>
-            <p>Calculate fault frequencies for inner/outer race, balls, and cage.</p>
-            <div style="margin-top: 20px;">
-                <a href="/" class="secondary-btn" style="padding: 8px 16px; width: auto; font-size: 0.9rem;">Back to Analysis Tool</a>
+            <div class="header-left">
+                <h1>Bearing <span>Frequency</span> Calculator</h1>
+                <p>Fault frequencies for inner/outer race, balls &amp; cage</p>
             </div>
+            <a href="/" class="back-btn">← Back to Analysis</a>
         </header>
 
-        <main>
-            <div class="controls-panel">
-                <div class="parameter-card">
-                    <h3>Bearing Parameters</h3>
-                    
+        <div class="main-grid">
+
+            <!-- ── Controls ── -->
+            <aside class="controls-panel">
+                <div class="card">
+                    <div class="card-title">Bearing Parameters</div>
+
                     <div class="input-group">
-                        <label for="nob">Number of Balls (NOB)</label>
+                        <label>Number of Balls (NOB)</label>
                         <input type="number" id="nob" value="9" step="1">
                     </div>
-
                     <div class="input-group">
-                        <label for="pcd">Pitch Circle Diameter (PCD) mm</label>
+                        <label>Pitch Circle Diameter (PCD) mm</label>
                         <input type="number" id="pcd" value="52" step="0.1">
                     </div>
-
                     <div class="input-group">
-                        <label for="bd_inch">Ball Diameter (BD) inch</label>
+                        <label>Ball Diameter (BD) inch</label>
                         <input type="number" id="bd_inch" value="0.315" step="0.001">
-                        <span class="hint">Updates Ball Diameter in mm.</span>
+                        <span class="hint">Updates Ball Diameter in mm</span>
                     </div>
-
                     <div class="input-group">
-                        <label for="zbd">Ball Diameter (zBD) mm</label>
+                        <label>Ball Diameter (zBD) mm</label>
                         <input type="number" id="zbd" value="8.0" step="0.01">
                     </div>
-
                     <div class="input-group">
-                        <label for="rpm">Shaft Speed (RPM)</label>
+                        <label>Shaft Speed (RPM)</label>
                         <input type="number" id="rpm" value="1800" step="10">
                     </div>
-
                     <div class="input-group">
-                        <label for="angle">Contact Angle (Degrees)</label>
+                        <label>Contact Angle (°)</label>
                         <input type="number" id="angle" value="0" step="0.1">
                     </div>
 
-                    <button id="calcBtn" class="primary-btn">Recalculate</button>
-                </div>
-            </div>
+                    <div class="input-group">
+                        <label>Signal Input (comma-separated arrays)</label>
+                        <div class="array-inputs">
+                            <input type="text" id="bearing_x_array" placeholder="Axis X">
+                            <input type="text" id="bearing_y_array" placeholder="Axis Y (optional)">
+                            <input type="text" id="bearing_z_array" placeholder="Axis Z (optional)">
+                        </div>
+                    </div>
 
-            <div class="data-panel">
-                <div class="stats-table-container">
-                    <table class="stats-table">
-                        <thead>
-                            <tr>
-                                <th>S.No</th>
-                                <th>Topic</th>
-                                <th style="text-align: right;">Hz (Frequency)</th>
-                                <th style="text-align: right;">Order</th>
-                            </tr>
-                        </thead>
-                        <tbody id="bearingStatsBody">
-                            <tr>
-                                <td>1</td>
-                                <td>Inner Ring Rotational Freq (IRF)</td>
-                                <td id="res_irf_hz" style="text-align: right;">-</td>
-                                <td id="res_irf_order" style="text-align: right;">1.00</td>
-                            </tr>
-                            <tr>
-                                <td>2</td>
-                                <td>Outer Ring Rotational Freq (ORF)</td>
-                                <td id="res_orf_hz" style="text-align: right;">0.00</td>
-                                <td id="res_orf_order" style="text-align: right;">0.00</td>
-                            </tr>
-                            <tr>
-                                <td>3</td>
-                                <td>Fundamental Train Frequency (FTF)</td>
-                                <td id="res_ftf_hz" style="text-align: right;">-</td>
-                                <td id="res_ftf_order" style="text-align: right;">-</td>
-                            </tr>
-                            <tr>
-                                <td>4</td>
-                                <td>Ball Spin Frequency (BSF)</td>
-                                <td id="res_bsf_hz" style="text-align: right;">-</td>
-                                <td id="res_bsf_order" style="text-align: right;">-</td>
-                            </tr>
-                            <tr>
-                                <td>5</td>
-                                <td>Ball Pass Freq - Inner Race (BPFI)</td>
-                                <td id="res_bpfi_hz" style="text-align: right;">-</td>
-                                <td id="res_bpfi_order" style="text-align: right;">-</td>
-                            </tr>
-                            <tr>
-                                <td>6</td>
-                                <td>Ball Pass Freq - Outer Race (BPFO)</td>
-                                <td id="res_bpfo_hz" style="text-align: right;">-</td>
-                                <td id="res_bpfo_order" style="text-align: right;">-</td>
-                            </tr>
-                            <tr>
-                                <td>7</td>
-                                <td>Rolling Freq of Irregularity (RFB)</td>
-                                <td id="res_rfb_hz" style="text-align: right;">-</td>
-                                <td id="res_rfb_order" style="text-align: right;">-</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <button id="calcBtn" class="calc-btn">Process &amp; Recalculate</button>
                 </div>
-            </div>
-        </main>
+            </aside>
 
-        <footer>
-            <p>&copy; 2026 Bearing Fault Analysis Tool</p>
-        </footer>
+            <!-- ── Data column ── -->
+            <div class="data-column">
+
+                <!-- Chart -->
+                <div class="chart-card">
+                    <div class="card-title">Envelope Spectrum (FFT) — 10 to 500 Hz</div>
+                    <div id="bearingSpectrumChart"></div>
+                    <div class="zoom-hint">Drag to Zoom • Double-click to Reset</div>
+                </div>
+
+                <!-- Calculated Fault Frequencies -->
+                <div class="fault-freq-card">
+                    <div class="fault-freq-header">
+                        <div class="card-title">Calculated Fault Frequencies</div>
+                    </div>
+                    <div class="freq-table-wrap">
+                        <table class="freq-table">
+                            <thead>
+                                <tr>
+                                    <th class="sno">#</th>
+                                    <th>Parameter</th>
+                                    <th class="num">Hz</th>
+                                    <th class="num">Order</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="sno">01</td>
+                                    <td class="topic-name">Inner Ring Rotational Freq <span class="topic-tag">IRF</span>
+                                    </td>
+                                    <td class="num hz-val" id="res_irf_hz">—</td>
+                                    <td class="num order-val" id="res_irf_order">1.00</td>
+                                </tr>
+                                <tr>
+                                    <td class="sno">02</td>
+                                    <td class="topic-name">Outer Ring Rotational Freq <span class="topic-tag">ORF</span>
+                                    </td>
+                                    <td class="num zero-val" id="res_orf_hz">0.00</td>
+                                    <td class="num zero-val" id="res_orf_order">0.00</td>
+                                </tr>
+                                <tr>
+                                    <td class="sno">03</td>
+                                    <td class="topic-name">Fundamental Train Frequency <span
+                                            class="topic-tag">FTF</span></td>
+                                    <td class="num hz-val" id="res_ftf_hz">—</td>
+                                    <td class="num order-val" id="res_ftf_order">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="sno">04</td>
+                                    <td class="topic-name">Ball Spin Frequency <span class="topic-tag">BSF</span></td>
+                                    <td class="num hz-val" id="res_bsf_hz">—</td>
+                                    <td class="num order-val" id="res_bsf_order">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="sno">05</td>
+                                    <td class="topic-name">Ball Pass Freq — Inner Race <span
+                                            class="topic-tag">BPFI</span></td>
+                                    <td class="num hz-val" id="res_bpfi_hz">—</td>
+                                    <td class="num order-val" id="res_bpfi_order">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="sno">06</td>
+                                    <td class="topic-name">Ball Pass Freq — Outer Race <span
+                                            class="topic-tag">BPFO</span></td>
+                                    <td class="num hz-val" id="res_bpfo_hz">—</td>
+                                    <td class="num order-val" id="res_bpfo_order">—</td>
+                                </tr>
+                                <tr>
+                                    <td class="sno">07</td>
+                                    <td class="topic-name">Rolling Freq of Irregularity <span
+                                            class="topic-tag">RFB</span></td>
+                                    <td class="num hz-val" id="res_rfb_hz">—</td>
+                                    <td class="num order-val" id="res_rfb_order">—</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Harmonics table -->
+                <div class="harmonics-card">
+                    <div class="harmonics-header">
+                        <div class="card-title">Bearing Fault Harmonics</div>
+                    </div>
+                    <div class="harmonics-scroll">
+                        <table class="harm-table">
+                            <thead>
+                                <tr>
+                                    <th class="defect-head" rowspan="2">Defect Type</th>
+                                    <th class="section-amp col-group-amp" colspan="6">Amplitude</th>
+                                    <th class="section-freq col-group-freq" colspan="6">Frequency (Hz)</th>
+                                </tr>
+                                <tr>
+                                    <!-- Amp harmonics -->
+                                    <th class="harm-idx col-group-amp">1×</th>
+                                    <th class="harm-idx">2×</th>
+                                    <th class="harm-idx">3×</th>
+                                    <th class="harm-idx">4×</th>
+                                    <th class="harm-idx">5×</th>
+                                    <th class="harm-idx">6×</th>
+                                    <!-- Freq harmonics -->
+                                    <th class="harm-idx col-group-freq">1×</th>
+                                    <th class="harm-idx">2×</th>
+                                    <th class="harm-idx">3×</th>
+                                    <th class="harm-idx">4×</th>
+                                    <th class="harm-idx">5×</th>
+                                    <th class="harm-idx">6×</th>
+                                </tr>
+                            </thead>
+                            <tbody id="harmonicsBody">
+                                <tr id="row_bsf">
+                                    <td class="defect-label">Ball Spin <span class="defect-badge badge-bsf">BSF</span>
+                                    </td>
+                                    <td id="bsf_a1" class="amp-val col-group-amp">—</td>
+                                    <td id="bsf_a2" class="amp-val">—</td>
+                                    <td id="bsf_a3" class="amp-val">—</td>
+                                    <td id="bsf_a4" class="amp-val">—</td>
+                                    <td id="bsf_a5" class="amp-val">—</td>
+                                    <td id="bsf_a6" class="amp-val">—</td>
+                                    <td id="bsf_f1" class="freq-val col-group-freq">—</td>
+                                    <td id="bsf_f2" class="freq-val">—</td>
+                                    <td id="bsf_f3" class="freq-val">—</td>
+                                    <td id="bsf_f4" class="freq-val">—</td>
+                                    <td id="bsf_f5" class="freq-val">—</td>
+                                    <td id="bsf_f6" class="freq-val">—</td>
+                                </tr>
+                                <tr id="row_bpfo">
+                                    <td class="defect-label">Outer Race <span
+                                            class="defect-badge badge-bpfo">BPFO</span></td>
+                                    <td id="bpfo_a1" class="amp-val col-group-amp">—</td>
+                                    <td id="bpfo_a2" class="amp-val">—</td>
+                                    <td id="bpfo_a3" class="amp-val">—</td>
+                                    <td id="bpfo_a4" class="amp-val">—</td>
+                                    <td id="bpfo_a5" class="amp-val">—</td>
+                                    <td id="bpfo_a6" class="amp-val">—</td>
+                                    <td id="bpfo_f1" class="freq-val col-group-freq">—</td>
+                                    <td id="bpfo_f2" class="freq-val">—</td>
+                                    <td id="bpfo_f3" class="freq-val">—</td>
+                                    <td id="bpfo_f4" class="freq-val">—</td>
+                                    <td id="bpfo_f5" class="freq-val">—</td>
+                                    <td id="bpfo_f6" class="freq-val">—</td>
+                                </tr>
+                                <tr id="row_bpfi">
+                                    <td class="defect-label">Inner Race <span
+                                            class="defect-badge badge-bpfi">BPFI</span></td>
+                                    <td id="bpfi_a1" class="amp-val col-group-amp">—</td>
+                                    <td id="bpfi_a2" class="amp-val">—</td>
+                                    <td id="bpfi_a3" class="amp-val">—</td>
+                                    <td id="bpfi_a4" class="amp-val">—</td>
+                                    <td id="bpfi_a5" class="amp-val">—</td>
+                                    <td id="bpfi_a6" class="amp-val">—</td>
+                                    <td id="bpfi_f1" class="freq-val col-group-freq">—</td>
+                                    <td id="bpfi_f2" class="freq-val">—</td>
+                                    <td id="bpfi_f3" class="freq-val">—</td>
+                                    <td id="bpfi_f4" class="freq-val">—</td>
+                                    <td id="bpfi_f5" class="freq-val">—</td>
+                                    <td id="bpfi_f6" class="freq-val">—</td>
+                                </tr>
+                                <tr id="row_ftf">
+                                    <td class="defect-label">Cage <span class="defect-badge badge-ftf">FTF</span></td>
+                                    <td id="ftf_a1" class="amp-val col-group-amp">—</td>
+                                    <td id="ftf_a2" class="amp-val">—</td>
+                                    <td id="ftf_a3" class="amp-val">—</td>
+                                    <td id="ftf_a4" class="amp-val">—</td>
+                                    <td id="ftf_a5" class="amp-val">—</td>
+                                    <td id="ftf_a6" class="amp-val">—</td>
+                                    <td id="ftf_f1" class="freq-val col-group-freq">—</td>
+                                    <td id="ftf_f2" class="freq-val">—</td>
+                                    <td id="ftf_f3" class="freq-val">—</td>
+                                    <td id="ftf_f4" class="freq-val">—</td>
+                                    <td id="ftf_f5" class="freq-val">—</td>
+                                    <td id="ftf_f6" class="freq-val">—</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div><!-- /data-column -->
+        </div><!-- /main-grid -->
+
+        <footer>&copy; 2026 Bearing Fault Analysis Tool</footer>
     </div>
+
+    <div id="loadingOverlay">
+        <div class="spinner"></div>
+        <div class="loading-text">PROCESSING SIGNAL...</div>
+    </div>
+
     <script src="static/bearing_script.js"></script>
 </body>
 
